@@ -1,0 +1,164 @@
+<!DOCTYPE>
+<html>
+	<head>
+		<style>
+			html {
+				background-color: #eee;
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			.card-container {
+				margin: 10px auto;
+				padding: 0 10px 0 10px;
+			}
+			.card {
+				background-color: white;
+				border-radius: 1px;
+				border-bottom: 1px solid #ddd;
+				font-family: sans-serif;
+				font-weight: lighter;
+				font-size: 1.2em;
+				color: #888;
+				padding: 10px;
+			}
+		</style>
+		<link rel="stylesheet" type="text/css" href='reset.css' />
+		<meta name="viewport" content="width=device-width, user-scalable=no">
+	</head>
+	<body>
+<!-- 		<input type='text' id='input'></input><input type='submit' id='submitButton'></input>
+		<p id='text'></p> -->
+
+		<template id='card'>
+			<div class='card-container'>
+				<div class='card text'>
+
+				</div>
+			</div>
+		</template>
+
+		<script type='text/javascript'>
+			var addCard = function (goal) {
+				var template = document.querySelector('template');
+				var textElement = template.content.querySelector('.text');
+				textElement.id = 'card-' + goal.getId() + '-text';
+				textElement.innerHTML = goal.getText();
+				var instance = template.content.cloneNode(true);
+				document.body.appendChild(instance);
+
+				goal.addListener(function () {
+					var textElement = document.querySelector('#card-' + goal.getId() + '-text');
+					textElement.innerHTML = goal.getText();
+				});
+			}
+
+			var Messenger = function () {
+				var _listeners = [];
+				var on = function (event) {
+					for (var i = 0; i < _listeners.length; i++){
+						_listeners[i](event);
+					}
+				}
+				var addListener = function (listener) {
+					_listeners.push(listener);
+				}
+				var self = {addListener: addListener, on: on};
+				return self;
+			}
+
+			var Goal = function (text, id) {
+				return (function (messenger, text, id) {
+					var _id = id;
+					var _text = text;
+					var self = {};
+					var getId = function () {
+						return _id;
+					}
+					var getText = function() {
+						return _text;
+					}
+					var setText = function(newText) {
+						_text = newText;
+						messenger.on('change');
+					}
+					var serialize = function () {
+						return JSON.stringify({_text: _text});
+					};
+					var self = {getId: getId, getText: getText, setText: setText, serialize: serialize};
+					self.addListener = messenger.addListener;
+					return self;
+				}(Messenger(), text, id))
+			};
+
+			var Set = function (type){
+				return (function (messenger, type) {
+					var _set = [];
+					var _type = type;
+					var _nextId = 0;
+					var _num = 0;
+					var getNum = function () { return _set.length; }
+					var create = function () {
+						var id = _nextId++;
+						// Arguments is not an array so we must make it one
+						var argsAndId = Array.prototype.slice.call(arguments);
+						argsAndId.push(id);
+						var newObj = _type.apply(this, argsAndId);
+						_set.push(newObj);
+						_num++;
+						messenger.on('add');
+					}
+					var remove = function (toRemove) {
+						for (var i = 0; i < _set.length; i++) {
+							if (_set[i] === toRemove) {
+								_set.splice(i, 1);
+								break;
+							}
+						}
+						_num--;
+						messenger.on('remove');
+					}
+					var getNth = function (index) {
+						return _set[index];
+					}
+					var getById = function () {
+						console.log('Not yet implemented');
+						return;
+					}
+					self = {getNum: getNum, create: create, remove: remove, getNth: getNth}
+					self.addListener = messenger.addListener;
+					return self;
+				}(Messenger(), type))
+			};
+
+			var goalSet = Set(Goal);
+
+			goalSet.addListener (function (event) {
+				if (event == 'add') {
+					var num = goalSet.getNum();
+					var goal = goalSet.getNth(num - 1);
+					addCard(goal);
+				}
+			});
+
+			goalSet.create('Call Grandma');
+
+			// goal.addListener(function() {
+			// 	var text = goal.getText();
+			// 	localStorage.text = text;
+			// 	document.getElementById('text').innerHTML = text;
+			// });
+			// document.getElementById('submitButton').onclick = function(e) {
+			// 	goal.setText(document.getElementById('input').value);
+			// }
+			// goal.setText((localStorage.text === undefined) ? 'Default Name 2' : localStorage.text);
+
+			// objBinder.addListener(function (obj){
+			// 	document.querySelector('#card-1').innerHTML = obj;
+			// });
+		</script>
+	</body>
+</html>
