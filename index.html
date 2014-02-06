@@ -30,8 +30,8 @@
 		<meta name="viewport" content="width=device-width, user-scalable=no">
 	</head>
 	<body>
-<!-- 		<input type='text' id='input'></input><input type='submit' id='submitButton'></input>
-		<p id='text'></p> -->
+		<input type='text' id='input'></input><input type='submit' id='submitButton'></input>
+		<p id='text'></p>
 
 		<template id='card'>
 			<div class='card-container'>
@@ -86,7 +86,7 @@
 						messenger.on('change');
 					}
 					var serialize = function () {
-						return JSON.stringify({_text: _text});
+						return JSON.stringify({text: _text, id: _id});
 					};
 					var self = {getId: getId, getText: getText, setText: setText, serialize: serialize};
 					self.addListener = messenger.addListener;
@@ -128,7 +128,21 @@
 						console.log('Not yet implemented');
 						return;
 					}
-					self = {getNum: getNum, create: create, remove: remove, getNth: getNth}
+					var getSerializedMeta = function () {
+						var num = getNum();
+						var ids = [];
+						for (var i = 0; i < num; i++) {
+							ids.push(getNth(i).getId());
+						}
+						return JSON.stringify({nextId: _nextId, num: _num, ids: ids});
+					}
+					var load = function (meta, set) {
+						_nextId = meta.nextId;
+						_num = meta.num;
+						_set = set;
+						messenger.on('load');
+					}
+					self = {getNum: getNum, create: create, remove: remove, getNth: getNth, getSerializedMeta: getSerializedMeta, load: load}
 					self.addListener = messenger.addListener;
 					return self;
 				}(Messenger(), type))
@@ -137,14 +151,46 @@
 			var goalSet = Set(Goal);
 
 			goalSet.addListener (function (event) {
+				// Add cards
 				if (event == 'add') {
 					var num = goalSet.getNum();
 					var goal = goalSet.getNth(num - 1);
 					addCard(goal);
 				}
-			});
+				// Add to local storage
+				if (event == 'add') {
+					localStorage.goalSet = goalSet.getSerializedMeta();
+					var num = goalSet.getNum();
+					var goal = goalSet.getNth(num - 1);
+					if (localStorage.goals === undefined) {
+						localStorage.goals = [];
+					}
+					localStorage['goal-'+goal.getId()] = goal.serialize();
+				}
+				// Remove all cards and add again if loaded
+				if (event == 'load') {
+					var num = goalSet.getNum();
+					for (var i = 0; i < num; i++) {
+						var goal = goalSet.getNth(i);
+						addCard(goal);
+					}
+				}
+			})
 
-			goalSet.create('Call Grandma');
+			if (false) {
+				localStorage.clear();
+				goalSet.create('Call Grandma');
+			} else {
+				var meta = JSON.parse(localStorage.goalSet);
+				var set = [];
+				for (var i = 0; i < meta.ids.length; i ++) {
+					var id = meta.ids[i];
+					var goalData = JSON.parse(localStorage['goal-'+id]);
+					var goal = Goal(goalData.text, goalData.id);
+					set.push(goal);
+				}
+				goalSet.load({nextId: meta.nextId, num: meta.num}, set);
+			}
 
 			// goal.addListener(function() {
 			// 	var text = goal.getText();
