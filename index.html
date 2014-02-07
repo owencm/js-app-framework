@@ -70,10 +70,11 @@
 				return self;
 			}
 
-			var Goal = function (text, id) {
+			// meta = {text, id}
+			var Goal = function (meta) {
 				return (function (messenger, text, id) {
-					var _id = id;
-					var _text = text;
+					var _id = meta.id;
+					var _text = meta.text;
 					var self = {};
 					var getId = function () {
 						return _id;
@@ -91,22 +92,23 @@
 					var self = {getId: getId, getText: getText, setText: setText, serialize: serialize};
 					self.addListener = messenger.addListener;
 					return self;
-				}(Messenger(), text, id))
+				}(Messenger(), meta))
 			};
 
-			var Set = function (type){
-				return (function (messenger, type) {
+			var typeNames = [];
+			typeNames[Goal] = 'Goal';
+
+			var Set = function (type, persist){
+				return (function (messenger, type, persist) {
 					var _set = [];
 					var _type = type;
 					var _nextId = 0;
 					var _num = 0;
 					var getNum = function () { return _set.length; }
-					var create = function () {
+					var create = function (meta) {
 						var id = _nextId++;
-						// Arguments is not an array so we must make it one
-						var argsAndId = Array.prototype.slice.call(arguments);
-						argsAndId.push(id);
-						var newObj = _type.apply(this, argsAndId);
+						meta.id = id;
+						var newObj = _type(meta);
 						_set.push(newObj);
 						_num++;
 						messenger.on('add');
@@ -142,13 +144,57 @@
 						_set = set;
 						messenger.on('load');
 					}
+					if (persist) {
+						// Set up saving changes to the set
+						messenger.addListener(function (event) {
+							var updateLocalStorageAfterChanges = function (entity) {
+								var updateLocalStorage = function (entity) {
+									localStorage[typeNames[_type] + '-' + entity.getId()] = entity.serialize();
+								}
+								entity.addListener(function (event) {
+									if (event == 'change') {
+										updateLocalStorage(entity)
+									}
+								});
+								updateLocalStorage(entity);
+							}
+							// Listen for changes and update localstorage
+							if (event == 'add') {
+								localStorage[typeNames[_type]+'Set'] = getSerializedMeta();
+								var num = getNum();
+								var entity = getNth(num - 1);
+								updateLocalStorageAfterChanges(entity);
+							}
+							// Listen to all for changes if loaded
+							if (event == 'load') {
+								var num = getNum();
+								for (var i = 0; i < num; i++) {
+									var entity = getNth(i);
+									updateLocalStorageAfterChanges(entity);	
+								}
+							}
+						});
+						// Load currently stored data
+						var storedSet = localStorage[typeNames[_type]+'Set'];
+						if (storedSet) {
+							var meta = JSON.parse(localStorage[typeNames[_type]+'Set']);
+							var set = [];
+							for (var i = 0; i < meta.ids.length; i ++) {
+								var id = meta.ids[i];
+								var entityData = JSON.parse(localStorage[typeNames[_type]+'-'+id]);
+								var entity = _type(entityData);
+								set.push(entity);
+							}
+							load({nextId: meta.nextId, num: meta.num}, set);
+						}
+					}
 					self = {getNum: getNum, create: create, remove: remove, getNth: getNth, getSerializedMeta: getSerializedMeta, load: load}
 					self.addListener = messenger.addListener;
 					return self;
-				}(Messenger(), type))
+				}(Messenger(), type, persist))
 			};
 
-			var goalSet = Set(Goal);
+			var goalSet = Set(Goal, true);
 
 			goalSet.addListener (function (event) {
 				// Add cards
@@ -157,17 +203,7 @@
 					var goal = goalSet.getNth(num - 1);
 					addCard(goal);
 				}
-				// Add to local storage
-				if (event == 'add') {
-					localStorage.goalSet = goalSet.getSerializedMeta();
-					var num = goalSet.getNum();
-					var goal = goalSet.getNth(num - 1);
-					if (localStorage.goals === undefined) {
-						localStorage.goals = [];
-					}
-					localStorage['goal-'+goal.getId()] = goal.serialize();
-				}
-				// Remove all cards and add again if loaded
+				// Listen to all for changes if loaded
 				if (event == 'load') {
 					var num = goalSet.getNum();
 					for (var i = 0; i < num; i++) {
@@ -175,36 +211,17 @@
 						addCard(goal);
 					}
 				}
-			})
+			});
 
-			if (false) {
-				localStorage.clear();
-				goalSet.create('Call Grandma');
-			} else {
-				var meta = JSON.parse(localStorage.goalSet);
-				var set = [];
-				for (var i = 0; i < meta.ids.length; i ++) {
-					var id = meta.ids[i];
-					var goalData = JSON.parse(localStorage['goal-'+id]);
-					var goal = Goal(goalData.text, goalData.id);
-					set.push(goal);
-				}
-				goalSet.load({nextId: meta.nextId, num: meta.num}, set);
+			var num = goalSet.getNum();
+			for (var i = 0; i < num; i++) {
+				var goal = goalSet.getNth(i);
+				addCard(goal);
 			}
 
-			// goal.addListener(function() {
-			// 	var text = goal.getText();
-			// 	localStorage.text = text;
-			// 	document.getElementById('text').innerHTML = text;
-			// });
-			// document.getElementById('submitButton').onclick = function(e) {
-			// 	goal.setText(document.getElementById('input').value);
-			// }
-			// goal.setText((localStorage.text === undefined) ? 'Default Name 2' : localStorage.text);
-
-			// objBinder.addListener(function (obj){
-			// 	document.querySelector('#card-1').innerHTML = obj;
-			// });
+			document.getElementById('submitButton').onclick = function(e) {
+				goalSet.create({text: document.getElementById('input').value});
+			}
 		</script>
 	</body>
 </html>
