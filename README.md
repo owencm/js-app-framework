@@ -1,8 +1,10 @@
-web-app-test
+A small JS web app framework
 ============
 
-An evening spent writing a simple framework which supports:
+This is the product of an evening spent writing a simple framework which supports:
 
-- Arbitrary models
+- Models (like classes for data types) and sets of them
 - Persistence to localstorage by default
-- Rendering cards using HTML5 templates
+- Rendering cards based on the models using HTML5 templates
+
+The result is a small web app for 'goal' setting, written with this framework. The library and app are inline.
